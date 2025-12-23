@@ -1,0 +1,72 @@
+server:
+  port: 9090
+
+spring:
+  application:
+    name: api-gateway
+  config:
+    import: optional:configserver:http://localhost:8888
+  cloud:
+    gateway:
+      default-filters:
+        - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+      routes:
+        # User Service Routes
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**, /api/users/**, /api/connections/**, /api/password-reset/**
+        
+        # Social Service Routes
+        - id: social-service
+          uri: lb://social-service
+          predicates:
+            - Path=/api/posts/**, /api/comments/**, /api/likes/**, /api/stories/**, /api/chats/**, /api/messages/**, /api/notifications/**, /api/bucket/**, /api/storage/**
+        
+        # Admin Service Routes
+        - id: admin-service
+          uri: lb://admin-service
+          predicates:
+            - Path=/api/admin/**, /api/analytics/**, /api/reports/**
+        
+        # WebSocket Route (Consolidated to Social Service for Chat/Notifications/Presence)
+        - id: websocket-route
+          uri: lb:ws://social-service
+          predicates:
+            - Path=/ws/**
+      
+      # Global CORS Configuration
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns:
+              - "http://localhost:*"
+              - "http://127.0.0.1:*"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+            max-age: 3600
+
+# Circuit Breaker Default Configuration
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
